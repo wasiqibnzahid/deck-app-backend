@@ -66,7 +66,9 @@ async def fetch_and_update_record(semaphore, record):
 async def fetch_and_update_records():
     query = '''
         SELECT *
-        FROM `geoapps-429420.New2Geo.geoserver`;
+        FROM `geoapps-429420.New2Geo.geoserver`
+        where Description like '% Tall coat by New LookThat new-coat feeling Notch lapelsPress-stud fastening Side pockets Regular fit Product Code: 113448586 }; { Brand :  Since setting up shop i%'
+        ;
     '''
     query_job = client.query(query)
     rows = query_job.result()

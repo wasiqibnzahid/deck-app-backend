@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CORS_ALLOW_ALL_ORIGINS = True
 
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'D://geoserver-key.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/wasiq/personal/back/key.json'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
