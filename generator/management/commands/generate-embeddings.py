@@ -8,12 +8,13 @@ from tensorflow.keras.models import Model
 import numpy as np
 from google.cloud import bigquery
 from transformers import BertTokenizer, TFBertModel
-import aiohttp
 import asyncio
-import concurrent.futures
+from django.core.management.base import BaseCommand
 
 # Initialize BigQuery client
 client = bigquery.Client()
+processed_count = 0
+lock = asyncio.Lock()
 
 # Load pre-trained model for image embeddings
 base_model = ResNet50(weights='imagenet')
@@ -23,64 +24,94 @@ model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 text_model = TFBertModel.from_pretrained('bert-base-uncased')
 
+
 def get_image_embedding(img_url):
-    response = requests.get(img_url)
-    img = Image.open(BytesIO(response.content)).resize((224, 224))
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
-    embedding = model.predict(img_array)
-    return embedding.flatten().tolist()
+    try:
+        response = requests.get(img_url)
+        response.raise_for_status()
+        img = Image.open(BytesIO(response.content)).resize((224, 224))
+        img_array = image.img_to_array(img)
+        img_array = np.expand_dims(img_array, axis=0)
+        img_array = preprocess_input(img_array)
+        embedding = model.predict(img_array)
+        return embedding.flatten().tolist()
+    except Exception as e:
+        return []
+
 
 def get_text_embedding(text):
-    inputs = tokenizer(text, return_tensors='tf', max_length=512, truncation=True, padding='max_length')
+    inputs = tokenizer(text, return_tensors='tf', max_length=512,
+                       truncation=True, padding='max_length')
     outputs = text_model(inputs)
     embedding = outputs.last_hidden_state[:, 0, :].numpy().flatten()
     return embedding.tolist()
 
-async def fetch_and_update_record(semaphore, record):
+
+async def fetch_and_update_record(semaphore, record_batch):
     async with semaphore:
-        image_url = record['Image']
-        description = record['Description']
-        
         loop = asyncio.get_event_loop()
-        print(f"generating embedding for image {image_url}")
-        image_embedding = await loop.run_in_executor(None, get_image_embedding, image_url)
-        print(f"generating embedding for text {description}")
-        text_embedding = await loop.run_in_executor(None, get_text_embedding, description)
-        
-        image_embedding_str = ', '.join(map(str, image_embedding))
-        text_embedding_str = ', '.join(map(str, text_embedding))
-        
-        # Update BigQuery table
-        print(f"updating query for image {image_url}")
-        update_query = f'''
-            UPDATE `geoapps-429420.New2Geo.geoserver`
-            SET image_embedding = [{image_embedding_str}],
-                text_embedding = [{text_embedding_str}]
-            WHERE SLat = {record['SLat']} AND SLong = {record['SLong']};
-        '''
+
+        embeddings = []
+        print("STARTING A BATCH OF LENGTH ", len(record_batch))
+        for record in record_batch:
+            image_url = record['Image']
+            description = record['Description']
+
+            image_embedding = await loop.run_in_executor(None, get_image_embedding, image_url)
+            text_embedding = await loop.run_in_executor(None, get_text_embedding, description)
+
+            embeddings.append((record, image_embedding, text_embedding))
+
+            async with lock:
+                global processed_count
+                processed_count += 1
+                print(f'Processed {processed_count} records')
+        print("Generating update query")
+        update_query = "UPDATE `geosearch-1511586674493.geoAppDB1.geospatialSales` SET image_embedding = CASE "
+        for record, image_embedding, text_embedding in embeddings:
+            image_embedding_str = ', '.join(map(str, image_embedding))
+            text_embedding_str = ', '.join(map(str, text_embedding))
+            update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
+                record['SLong']} THEN [{image_embedding_str}] END, "
+        update_query = update_query[:-2] + " text_embedding = CASE "
+        for record, image_embedding, text_embedding in embeddings:
+            text_embedding_str = ', '.join(map(str, text_embedding))
+            update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
+                record['SLong']} THEN [{text_embedding_str}] END;"
+        print("Starting batch upload")
         client.query(update_query)
-        print("done for image {image_url}")
+        print("DONE A BATCH")
+
 
 async def fetch_and_update_records():
     query = '''
         SELECT *
-        FROM `geoapps-429420.New2Geo.geoserver`
-        where Description like '% Tall coat by New LookThat new-coat feeling Notch lapelsPress-stud fastening Side pockets Regular fit Product Code: 113448586 }; { Brand :  Since setting up shop i%'
-        ;
+        FROM `geosearch-1511586674493.geoAppDB1.geospatialSales`;
     '''
+
     query_job = client.query(query)
     rows = query_job.result()
-    
-    semaphore = asyncio.Semaphore(10)  # Limit to 10 concurrent tasks
+
+    semaphore = asyncio.Semaphore(20)  # Limit to 10 concurrent tasks
     tasks = []
+    record_batch = []
+    batch_size = 5
+
     for row in rows:
-        record = dict(row)
-        task = fetch_and_update_record(semaphore, record)
+        record_batch.append(dict(row))
+        if len(record_batch) == batch_size:
+            task = fetch_and_update_record(semaphore, record_batch)
+            tasks.append(task)
+            record_batch = []
+
+    if record_batch:
+        task = fetch_and_update_record(semaphore, record_batch)
         tasks.append(task)
-    
+
     await asyncio.gather(*tasks)
 
-# Run the function
-asyncio.run(fetch_and_update_records())
+
+class Command(BaseCommand):
+    def handle(self, *args, **options):
+        asyncio.run(fetch_and_update_records())
+        print(f'Total records processed: {processed_count}')
