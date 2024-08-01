@@ -10,6 +10,9 @@ from google.cloud import bigquery
 from transformers import BertTokenizer, TFBertModel
 import asyncio
 from django.core.management.base import BaseCommand
+import torch
+import open_clip
+import json
 
 # Initialize BigQuery client
 client = bigquery.Client()
@@ -24,18 +27,25 @@ model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 text_model = TFBertModel.from_pretrained('bert-base-uncased')
 
+openclip_model, _, openclip_preprocess = open_clip.create_model_and_transforms(
+    'ViT-B-32', pretrained='openai')
+openclip_tokenizer = open_clip.get_tokenizer('ViT-B-32')
+
 
 def get_image_embedding(img_url):
     try:
         response = requests.get(img_url)
         response.raise_for_status()
-        img = Image.open(BytesIO(response.content)).resize((224, 224))
-        img_array = image.img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0)
-        img_array = preprocess_input(img_array)
-        embedding = model.predict(img_array)
-        return embedding.flatten().tolist()
+        img = Image.open(BytesIO(response.content)).convert("RGB")
+        # Preprocess the image and add batch dimension
+        img = openclip_preprocess(img).unsqueeze(0)
+
+        with torch.no_grad():
+            embedding = openclip_model.encode_image(img)
+
+        return embedding.cpu().numpy().flatten().tolist()
     except Exception as e:
+        print(f"Error: {e}")
         return []
 
 
@@ -66,19 +76,30 @@ async def fetch_and_update_record(semaphore, record_batch):
                 global processed_count
                 processed_count += 1
                 print(f'Processed {processed_count} records')
+
         print("Generating update query")
         update_query = "UPDATE `geosearch-1511586674493.geoAppDB1.geospatialSales` SET image_embedding = CASE "
-        for record, image_embedding, text_embedding in embeddings:
+        for record, image_embedding, _ in embeddings:
             image_embedding_str = ', '.join(map(str, image_embedding))
+            update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
+                record['SLong']} THEN [{image_embedding_str}] "
+
+        update_query += "END, text_embedding = CASE "
+        for record, _, text_embedding in embeddings:
             text_embedding_str = ', '.join(map(str, text_embedding))
             update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
-                record['SLong']} THEN [{image_embedding_str}] END, "
-        update_query = update_query[:-2] + " text_embedding = CASE "
-        for record, image_embedding, text_embedding in embeddings:
-            text_embedding_str = ', '.join(map(str, text_embedding))
-            update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
-                record['SLong']} THEN [{text_embedding_str}] END;"
-        print("Starting batch upload")
+                record['SLong']} THEN [{text_embedding_str}] "
+
+        # Adding WHERE clause to ensure valid update
+        update_query += "END WHERE SLat IN ("
+        update_query += ', '.join([str(record['SLat'])
+                                  for record, _, _ in embeddings])
+        update_query += ") AND SLong IN ("
+        update_query += ', '.join([str(record['SLong'])
+                                  for record, _, _ in embeddings])
+        update_query += ");"
+
+        print(f"The query is {update_query}")
         client.query(update_query)
         print("DONE A BATCH")
 
@@ -98,6 +119,7 @@ async def fetch_and_update_records():
     batch_size = 5
 
     for row in rows:
+        print(f"URL IS {row["Image"]}")
         record_batch.append(dict(row))
         if len(record_batch) == batch_size:
             task = fetch_and_update_record(semaphore, record_batch)
