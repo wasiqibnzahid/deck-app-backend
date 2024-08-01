@@ -182,7 +182,7 @@ def search_description(request):
 
         # Sort by similarity and get top K records
         top_records = sorted(
-            similarities, key=lambda x: x[1], reverse=True)[:5]
+            similarities, key=lambda x: x[1], reverse=True)[:50]
 
         # Fetch the full records based on top K results
         ids = [record[0] for record in top_records]
