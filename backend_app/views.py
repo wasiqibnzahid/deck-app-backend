@@ -18,7 +18,7 @@ def get_closest_records(request):
     latitude = request.GET.get('latitude')
     start = request.GET.get('start', "2020-01-01")
     end = request.GET.get('end', '2030-01-01')
-
+    is_first = request.GET.get("isFirst") == "true"
     if not longitude or not latitude:
         return JsonResponse({'error': 'Longitude and Latitude parameters are required.'}, status=400)
 
@@ -69,7 +69,10 @@ ORDER BY
 LIMIT
   50;
 """
-    all_records = f'''
+    all_items = []
+    if (is_first):
+
+        all_records = f'''
     select
   IId  as IId ,
   SLat  as SLat ,
@@ -83,13 +86,13 @@ where date between DATE('{start}') AND DATE('{end}')
 
     group by SLat, SLong, IId
     '''
+        all_items = client.query(all_records).result()
+        all_items = [dict(row.items()) for row in all_items]
 
     query_job = client.query(query)
-    all_items = client.query(all_records).result()
     results = query_job.result()
 
     results = [dict(row.items()) for row in results]
-    all_items = [dict(row.items()) for row in all_items]
     # all_items = []
     return JsonResponse({"closest": results, "all": all_items}, safe=False)
 
