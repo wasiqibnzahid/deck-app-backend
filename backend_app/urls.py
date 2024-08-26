@@ -22,5 +22,4 @@ urlpatterns = [
          name='get_closest_records'),
     path('search-description/', views.search_description,
          name='search_description'),  # Adjust 'db' to your app name
-    path("within-range/", views.get_points_within_range)
 ]
