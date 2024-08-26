@@ -143,7 +143,7 @@ def search_description(request):
      ST_GEOGPOINT({longitude}, {latitude})
    ) AS distance
             FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
-            WHERE date between DATE('{start}') AND DATE('{end}') and LOWER(Description) LIKE LOWER('%{search_text}%')
+            WHERE date between DATE('{start}') AND DATE('{end}') and LOWER(Title) LIKE LOWER('%{search_text}%')
             group by SLat, SLong, IId
             order by distance
             LIMIT 50
