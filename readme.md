@@ -16,3 +16,6 @@ To the actual path of the key
 
 # This runs on default on PORT 8000
 
+The views.py has a get function, you can add new models there
+There is a file in commands folder to generate embeddings for images, you should use it to pre-create embeddings
+instead of generating them in runtime, you can modify it to use any other model instead of OpenClip
