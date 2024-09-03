@@ -70,9 +70,8 @@ LIMIT
   50;
 """
     all_items = []
-    if (is_first):
 
-        all_records = f'''
+    all_records = f'''
     select
   IId  as IId ,
   SLat  as SLat ,
@@ -80,14 +79,15 @@ LIMIT
   ANY_VALUE(Title)  as Title ,
   ANY_VALUE(Description)  as Description ,
   ANY_VALUE(Image)  as Image ,
-  AVG(weekly_sales) AS avg_weekly_sales
+  AVG(weekly_sales) AS avg_weekly_sales,
+  ANY_VALUE(color) as color
   from `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
 where date between DATE('{start}') AND DATE('{end}')
 
     group by SLat, SLong, IId
     '''
-        all_items = client.query(all_records).result()
-        all_items = [dict(row.items()) for row in all_items]
+    all_items = client.query(all_records).result()
+    all_items = [dict(row.items()) for row in all_items]
 
     query_job = client.query(query)
     results = query_job.result()
@@ -245,11 +245,9 @@ def search_description(request):
             FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
 
             WHERE IId = {search_text}
-            and date between DATE('{start}') AND DATE('{end}')
-
             group by SLat, SLong, IId
             order by distance
-            LIMIT 50
+            LIMIT 51
         '''
         query_job = client.query(query)
         result = query_job.result()
