@@ -1,4 +1,6 @@
 from google.cloud import bigquery
+from google.oauth2 import service_account
+import os
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from transformers import BertTokenizer, TFBertModel
@@ -23,7 +25,13 @@ def get_closest_records(request):
         return JsonResponse({'error': 'Longitude and Latitude parameters are required.'}, status=400)
 
     # Initialize BigQuery client
-    client = bigquery.Client()
+    key_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+
+# Load the service account credentials
+    credentials = service_account.Credentials.from_service_account_file(
+        key_path)
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
 
 #     query = f'''
 #         SELECT  HId,
@@ -106,6 +114,7 @@ def get_text_embedding(text: str) -> np.ndarray:
 
 @require_GET
 def search_description(request):
+    print(f"asd {os.environ['GOOGLE_APPLICATION_CREDENTIALS']}")
     search_text = request.GET.get('search_text')
     longitude = request.GET.get('longitude')
     latitude = request.GET.get('latitude')
@@ -117,8 +126,13 @@ def search_description(request):
         return JsonResponse({'error': 'Search text parameter is required.'}, status=400)
 
     # Initialize BigQuery client
+    key_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
 
-    client = bigquery.Client()
+    credentials = service_account.Credentials.from_service_account_file(
+        key_path)
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+
     count = 0
 
     if mode == "bigquery":
