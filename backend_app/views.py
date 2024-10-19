@@ -217,9 +217,14 @@ def search_description(request):
                     IId,
                     SLat,
                     SLong,
-                    ANY_VALUE(Title),
-                    ANY_VALUE(Description),
-                    ANY_VALUE(Image)
+                     ANY_VALUE(SPId) as SPId ,
+                    ANY_VALUE(D2Sm) as D2Sm ,
+                    ANY_VALUE(HIdDensity) as HIdDensity ,
+                    ANY_VALUE(Title) as Title ,
+                    ANY_VALUE(Description) as Description ,
+                    ANY_VALUE(Image) as Image ,
+                    ANY_VALUE(weeknumber) as weeknumber ,
+                    ANY_VALUE(weekly_sales) as weekly_sales
             FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
             where date between DATE('{start}') AND DATE('{end}')
             and IId IN ({ids_placeholder})
