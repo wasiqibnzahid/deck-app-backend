@@ -51,7 +51,7 @@ def get_closest_records(request):
 #   weeknumber,
 #   weekly_sales,
 #                ST_DISTANCE(ST_GeogPoint(SLong, SLat), ST_GeogPoint({longitude}, {latitude})) AS distance
-#           FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+#           FROM `{os.ge}`
 #          LIMIT 50;
 #     '''
 
@@ -69,7 +69,7 @@ def get_closest_records(request):
 ST_GEOGPOINT({longitude}, {latitude})
   ) AS distance
 FROM
-`geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+`{os.getenv('BIGQUERY_TABLE_NAME')}`
 where date between DATE('{start}') AND DATE('{end}')
 group by SLat, SLong, IId
 ORDER BY
@@ -89,7 +89,7 @@ LIMIT
   ANY_VALUE(Image)  as Image ,
   AVG(weekly_sales) AS avg_weekly_sales,
   ANY_VALUE(color) as color
-  from `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+  from `{os.getenv('BIGQUERY_TABLE_NAME')}`
 where date between DATE('{start}') AND DATE('{end}')
 
     group by SLat, SLong, IId
@@ -159,7 +159,7 @@ def search_description(request):
      ANY_VALUE(location),
      ST_GEOGPOINT({longitude}, {latitude})
    ) AS distance
-            FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+            FROM `{os.getenv('BIGQUERY_TABLE_NAME')}`
             WHERE date between DATE('{start}') AND DATE('{end}') and LOWER(Title) LIKE LOWER('%{search_text}%')
             group by SLat, SLong, IId
             order by distance
@@ -180,7 +180,7 @@ def search_description(request):
         # Define query to fetch embeddings from BigQuery
         query = f'''
             SELECT IId, ANY_VALUE(image_embedding) as image_embedding
-            FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+            FROM `{os.getenv('BIGQUERY_TABLE_NAME')}`
             where date between DATE('{start}') AND DATE('{end}')
 
             group by IId, SLat, SLong
@@ -225,7 +225,7 @@ def search_description(request):
                     ANY_VALUE(Image) as Image ,
                     ANY_VALUE(weeknumber) as weeknumber ,
                     ANY_VALUE(weekly_sales) as weekly_sales
-            FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+            FROM `{os.getenv('BIGQUERY_TABLE_NAME')}`
             where date between DATE('{start}') AND DATE('{end}')
             and IId IN ({ids_placeholder})
             group by IId, SLat, SLong
@@ -261,7 +261,7 @@ def search_description(request):
      ANY_VALUE(location),
      ST_GEOGPOINT({longitude}, {latitude})
    ) AS distance
-            FROM `geosearch-1511586674493.geoAppDB1.geospatialSales_new_final`
+            FROM `{os.getenv('BIGQUERY_TABLE_NAME')}`
 
             WHERE IId = {search_text}
             group by SLat, SLong, IId

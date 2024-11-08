@@ -10,7 +10,7 @@ class Command(BaseCommand):
         client = bigquery.Client()
 
         # Replace with your actual BigQuery table reference
-        table_id = "geosearch-1511586674493.geoAppDB1.geospatialSales_new_final"
+        table_id = os.getenv('BIGQUERY_TABLE_NAME')
 
         # Step 1: Get the maximum weekly sales value
         max_sales_query = f"""

@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta
 from google.cloud import bigquery
 from django.core.management.base import BaseCommand
-
+import os
 # Initialize BigQuery client
 client = bigquery.Client()
 
@@ -40,9 +40,9 @@ def generate_random_data(record):
 
 
 async def randomize_data(batch_size=5):
-    query = '''
+    query = f'''
         SELECT *
-        FROM `geosearch-1511586674493.geoAppDB1.geospatialSales` LIMIT 10;
+        FROM `{os.getenv('BIGQUERY_TABLE_NAME')}` LIMIT 10;
     '''
 
     query_job = client.query(query)
@@ -64,7 +64,7 @@ async def randomize_data(batch_size=5):
             all_rows.append(new_row)
 
     # Upload data in batches using SQL INSERT queries
-    table_id = "geosearch-1511586674493.geoAppDB1.geospatialSales"
+    table_id = os.getenv('BIGQUERY_TABLE_NAME')
     total_records = len(all_rows)
     for start in range(0, total_records, batch_size):
         end = min(start + batch_size, total_records)

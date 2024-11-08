@@ -13,6 +13,7 @@ from django.core.management.base import BaseCommand
 import torch
 import open_clip
 import json
+import os
 
 # Initialize BigQuery client
 client = bigquery.Client()
@@ -78,13 +79,13 @@ async def fetch_and_update_record(semaphore, record_batch):
                 print(f'Processed {processed_count} records')
 
         print("Generating update query")
-        update_query = "UPDATE `geosearch-1511586674493.geoAppDB1.geospatialSales` SET image_embedding = CASE "
+        update_query = f"UPDATE `{os.getenv('BIGQUERY_TABLE_NAME')}` SET image_embedding = CASE "
         for record, image_embedding, _ in embeddings:
             image_embedding_str = ', '.join(map(str, image_embedding))
             update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
                 record['SLong']} THEN [{image_embedding_str}] "
 
-        update_query += "END, text_embedding = CASE "
+        update_query += "END, text_embeddin}g = CASE "
         for record, _, text_embedding in embeddings:
             text_embedding_str = ', '.join(map(str, text_embedding))
             update_query += f"WHEN SLat = {record['SLat']} AND SLong = {
@@ -105,9 +106,9 @@ async def fetch_and_update_record(semaphore, record_batch):
 
 
 async def fetch_and_update_records():
-    query = '''
+    query = f'''
         SELECT *
-        FROM `geosearch-1511586674493.geoAppDB1.geospatialSales`;
+        FROM `{os.getenv('BIGQUERY_TABLE_NAME')}`;
     '''
 
     query_job = client.query(query)

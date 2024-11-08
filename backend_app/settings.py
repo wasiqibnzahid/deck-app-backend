@@ -18,6 +18,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/wasiq/personal/back/key.json'
+os.environ['BIGQUERY_TABLE_NAME'] = 'geosearch-1511586674493.geoAppDB1.geospatialSales_new_final'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
